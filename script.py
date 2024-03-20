@@ -3,6 +3,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.chrome.options import Options
 from time import sleep
 import pandas as pd
 
@@ -20,8 +21,13 @@ def read_processed_contacts():
     try:
         with open('broadcast_results.txt', 'r') as file:
             for line in file:
-                if "Message sent to: " in line or "Sorry message could not sent to " in line:
-                    _, contact = line.strip().split(": ")
+                # Checking and extracting phone number for "Message sent to"
+                if "Message sent to: " in line:
+                    contact = line.strip().split("Message sent to: ")[-1]
+                    processed.add(contact)
+                # Checking and extracting phone number for "Sorry message could not sent to"
+                elif "Sorry message could not sent to " in line:
+                    contact = line.strip().split("Sorry message could not sent to ")[-1]
                     processed.add(contact)
     except FileNotFoundError:
         print("broadcast_results.txt not found. Starting fresh.")
@@ -38,7 +44,11 @@ filtered_phone_numbers = set(filter(None, phones))
 contacts_to_process = filtered_phone_numbers - processed_contacts
 print(f"Processing {len(contacts_to_process)} new contacts.")
 
-driver = webdriver.Chrome(ChromeDriverManager().install())
+chrome_options = Options()
+# Add any specific options you might need
+# chrome_options.add_argument("--headless")  # Example: running Chrome in headless mode
+
+driver = webdriver.Chrome(options=chrome_options)
 driver.get('https://web.whatsapp.com')
 input("Press ENTER after login into Whatsapp Web and your chats are visiable.")
 
