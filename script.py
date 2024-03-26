@@ -1,3 +1,4 @@
+import pandas as pd
 from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -5,7 +6,6 @@ from selenium.webdriver.common.by import By
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.options import Options
 from time import sleep
-import pandas as pd
 
 def float_to_phone(number):
     if pd.isna(number):
@@ -13,36 +13,45 @@ def float_to_phone(number):
     number_str = '{:.0f}'.format(number)
     return number_str if len(number_str) == 11 else None
 
-df = pd.read_excel('phones_rovercar.xlsx')
-
-# Function to read already processed numbers
 def read_processed_contacts():
-    processed = set()
+    sent_contacts = set()
+    failed_contacts = set()
     try:
         with open('broadcast_results.txt', 'r') as file:
             for line in file:
-                # Checking and extracting phone number for "Message sent to"
                 if "Message sent to: " in line:
                     contact = line.strip().split("Message sent to: ")[-1]
-                    processed.add(contact)
-                # Checking and extracting phone number for "Sorry message could not sent to"
+                    sent_contacts.add(contact)
                 elif "Sorry message could not sent to " in line:
                     contact = line.strip().split("Sorry message could not sent to ")[-1]
-                    processed.add(contact)
+                    failed_contacts.add(contact)
     except FileNotFoundError:
         print("broadcast_results.txt not found. Starting fresh.")
-    return processed
+    return sent_contacts, failed_contacts
 
-# Read already processed contacts
-processed_contacts = read_processed_contacts()
+sent_contacts, failed_contacts = read_processed_contacts()
+processed_contacts = sent_contacts.union(failed_contacts)
 print(f"{len(processed_contacts)} contacts already processed.")
 
+df = pd.read_excel('phones_rovercar.xlsx')
 phones = df['Телефон'].apply(float_to_phone).tolist() + df['Мобильный телефон'].apply(float_to_phone).tolist()
 filtered_phone_numbers = set(filter(None, phones))
 
-# Exclude already processed contacts
 contacts_to_process = filtered_phone_numbers - processed_contacts
 print(f"Processing {len(contacts_to_process)} new contacts.")
+
+df['Сообщение Отправлено'] = "нет"  # Default to "нет"
+
+for index, row in df.iterrows():
+    phone = float_to_phone(row['Телефон'])
+    mobile_phone = float_to_phone(row['Мобильный телефон'])
+    if phone in sent_contacts or mobile_phone in sent_contacts:
+        df.at[index, 'Сообщение Отправлено'] = "да"
+    elif phone in failed_contacts or mobile_phone in failed_contacts:
+        df.at[index, 'Сообщение Отправлено'] = "нет"
+
+
+df.to_excel('updated_phones_rovercar.xlsx', index=False)
 
 chrome_options = Options()
 # Add any specific options you might need
